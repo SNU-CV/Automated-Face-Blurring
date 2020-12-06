@@ -35,7 +35,6 @@ def initialize_detector():
 
 # https://towardsdatascience.com/building-a-face-recognizer-in-python-7fd6630c6340
 def detect_face(frame, speed):
-    # speed : resize factor to speed up recognition.
     small_frame = cv2.resize(frame, (0, 0), fx=1/speed, fy=1/speed)
     rgb_small_frame = small_frame[:, :, ::-1]
     
@@ -60,6 +59,7 @@ def detect_eyes(img, gray, faces):
 
 def recognize_video(video = 0, speed = 4):
     # video : path to video file, 0 to use webcam
+    # speed : resize factor to speed up recognition.
     video_capture = cv2.VideoCapture(video)
     
     face_locations = []
