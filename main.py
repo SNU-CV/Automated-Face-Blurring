@@ -1,3 +1,8 @@
+# references
+#
+# https://towardsdatascience.com/building-a-face-recognizer-in-python-7fd6630c6340
+# https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_objdetect/py_face_detection/py_face_detection.html
+
 import face_recognition
 import cv2
 import numpy as np
@@ -12,7 +17,6 @@ def initialize_haarcascades():
     face_cascade = cv2.CascadeClassifier(cv2_path + 'haarcascade_frontalface_default.xml')
     eye_cascade = cv2.CascadeClassifier(cv2_path + 'haarcascade_eye.xml')
     
-# https://towardsdatascience.com/building-a-face-recognizer-in-python-7fd6630c6340
 def initialize_detector():
     global face_encodings
     global face_names
@@ -33,20 +37,27 @@ def initialize_detector():
         names[i] = names[i].replace(cur_direc, "")  
         faces_names.append(names[i])
 
-# https://towardsdatascience.com/building-a-face-recognizer-in-python-7fd6630c6340
-def detect_face(frame, speed):
-    small_frame = cv2.resize(frame, (0, 0), fx=1/speed, fy=1/speed)
-    rgb_small_frame = small_frame[:, :, ::-1]
+def detect_face(frame):
+    rgb_frame = frame[:, :, ::-1]
     
-    face_locations = face_recognition.face_locations(rgb_small_frame)
-    face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+    face_locations = face_recognition.face_locations(rgb_frame, number_of_times_to_upsample=2)
 
     return face_locations
     
-def whose_face(face):
-    pass
+def recognize_face(face_locations, frame):
+    face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+    face_names = []
+    for face_encoding in face_encodings:
+        matches = face_recognition.compare_faces (faces_encodings, face_encoding)
+        name = "Unknown"
+        face_distances = face_recognition.face_distance( faces_encodings, face_encoding)
+        best_match_index = np.argmin(face_distances)
+        if matches[best_match_index]:
+            name = faces_names[best_match_index]
+        face_names.append(name)
+            
+    return face_names
 
-# https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_objdetect/py_face_detection/py_face_detection.html
 def detect_eyes(img, gray, faces):
     for (top, right, bottom, left) in faces:
         roi_gray = gray[4*top:4*bottom, 4*left:4*right]
@@ -71,9 +82,11 @@ def recognize_video(video = 0, speed = 4):
     while True:
         ret, frame = video_capture.read()
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        small_frame = cv2.resize(frame, (0, 0), fx=1/speed, fy=1/speed)
             
         if process_this_frame:
-            face_locations = detect_face(frame, speed)
+            face_locations = detect_face(small_frame)
+            face_names = recognize_face(face_locations, small_frame)
             
         for (top, right, bottom, left) in face_locations:
             top *= speed
