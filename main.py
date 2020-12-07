@@ -1,21 +1,12 @@
 # references
 #
 # https://towardsdatascience.com/building-a-face-recognizer-in-python-7fd6630c6340
-# https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_objdetect/py_face_detection/py_face_detection.html
 
 import face_recognition
 import cv2
 import numpy as np
 import os
 import glob
-
-def initialize_haarcascades():
-    global face_cascade
-    global eye_cascade
-    
-    cv2_path = cv2.data.haarcascades
-    face_cascade = cv2.CascadeClassifier(cv2_path + 'haarcascade_frontalface_default.xml')
-    eye_cascade = cv2.CascadeClassifier(cv2_path + 'haarcascade_eye.xml')
     
 def initialize_detector():
     global face_exempt_encodings
@@ -50,50 +41,63 @@ def detect_face(frame):
 
     return face_locations
     
-def match_face(face_locations, frame):
-    face_encodings = face_recognition.face_encodings(frame, face_locations)
+def match_face(face_encodings, frame, temporal_encodings):
     are_matched = []
 
     if len(face_exempt_encodings) == 0:
-        return [False] * len(face_locations)
+        return [False] * len(face_encodings)
 
     for face_encoding in face_encodings:
-        matches = face_recognition.compare_faces(face_exempt_encodings, face_encoding)
         is_matched = False
-        face_distances = face_recognition.face_distance(face_exempt_encodings, face_encoding)
-        best_match_index = np.argmin(face_distances)
-        if matches[best_match_index]:
+        exempt_distances = face_recognition.face_distance(face_exempt_encodings, face_encoding)
+        temporal_distances = face_recognition.face_distance(temporal_encodings, face_encoding)
+        print(exempt_distances)
+        print(temporal_distances)
+        
+        if len(exempt_distances) > 0 and np.amin(exempt_distances) < 0.9:
             is_matched = True
+
+        if len(temporal_distances) > 0 and np.amin(temporal_distances) < 0.25:
+            is_matched = True
+
         are_matched.append(is_matched)
             
     return are_matched
 
-def recognize_video(video = 0, speed = 4):
+def recognize_video(video = 0, resize_factor = 4):
     # video : path to video file, 0 to use webcam
-    # speed : resize factor to speed up recognition.
+    # resize_factor : resize factor to speed up recognition.
     video_capture = cv2.VideoCapture(video)
     
     face_locations = []
     face_encodings = []
-    face_names = []
+    face_matches = []
     process_this_frame = True
-
+    temporal_encodings = []
     
     while True:
         ret, frame = video_capture.read()
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        small_frame = cv2.resize(frame, (0, 0), fx=1/speed, fy=1/speed)
+        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        small_frame = cv2.resize(frame, (0, 0), fx=1/resize_factor, fy=1/resize_factor)
             
         if process_this_frame:
             face_locations = detect_face(small_frame)
-            face_matches = match_face(face_locations, small_frame)
+            if len(face_locations) == 0:
+                face_encodings = []
+                face_matches = []
+                temporal_encodings = []
+            else:
+                face_encodings = face_recognition.face_encodings(frame, face_locations)
+                face_matches = match_face(face_encodings, small_frame, temporal_encodings)
+                temporal_encodings = np.array(face_encodings)[np.array(face_matches)].tolist()
             
         for i, (top, right, bottom, left) in enumerate(face_locations):
-            top *= speed
-            right *= speed
-            bottom *= speed
-            left *= speed
+            top *= resize_factor
+            right *= resize_factor
+            bottom *= resize_factor
+            left *= resize_factor
             
+            # apply gaussian blur
             if (not face_matches[i]):
                 region = frame[top:bottom, left:right]
                 kernel_size = 100 if (right - left) > 100 and (bottom - top) > 100 else min((right - left), (bottom - top)) 
@@ -109,7 +113,6 @@ def recognize_video(video = 0, speed = 4):
 
     
 if __name__ == "__main__":
-    # initialize_haarcascades()
     initialize_detector()
     
     cur_direc = os.getcwd()
