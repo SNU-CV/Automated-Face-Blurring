@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import os
 import glob
-    
+
 def initialize_detector():
     global face_exempt_encodings
     global face_exempt_names
@@ -30,14 +30,19 @@ def initialize_detector():
             continue
         elif len(image_encoding) > 1:
             print("More than one face is found in given image: " + names[i])
-            continue 
+            continue
 
-        face_exempt_encodings.append(image_encoding[0]) 
+        face_exempt_encodings.append(image_encoding)
         face_exempt_names.append(names[i])
+
+    face_exempt_encodings = np.array(face_exempt_encodings)
+    face_exempt_encodings = np.squeeze(face_exempt_encodings)
+    print(face_exempt_encodings.shape)
+
 
 def detect_face(frame):
     rgb_frame = frame[:, :, ::-1]
-    face_locations = face_recognition.face_locations(rgb_frame, number_of_times_to_upsample=2)
+    face_locations = face_recognition.face_locations(rgb_frame, number_of_times_to_upsample=0, model='cnn')
 
     return face_locations
     
@@ -49,12 +54,13 @@ def match_face(face_encodings, frame, temporal_encodings):
 
     for face_encoding in face_encodings:
         is_matched = False
+        face_encoding = np.array(face_encoding)
         exempt_distances = face_recognition.face_distance(face_exempt_encodings, face_encoding)
         temporal_distances = face_recognition.face_distance(temporal_encodings, face_encoding)
         print(exempt_distances)
         print(temporal_distances)
         
-        if len(exempt_distances) > 0 and np.amin(exempt_distances) < 0.3:
+        if len(exempt_distances) > 0 and np.amin(exempt_distances) < 0.45:
             is_matched = True
 
         if len(temporal_distances) > 0 and np.amin(temporal_distances) < 0.2:
@@ -64,7 +70,7 @@ def match_face(face_encodings, frame, temporal_encodings):
             
     return are_matched
 
-def recognize_video(video = 0, resize_factor = 4):
+def recognize_video(video = 0, resize_factor = 1):
     # video : path to video file, 0 to use webcam
     # resize_factor : resize factor to speed up recognition.
     video_capture = cv2.VideoCapture(video)
@@ -74,7 +80,8 @@ def recognize_video(video = 0, resize_factor = 4):
     face_matches = []
     process_this_frame = True
     temporal_encodings = []
-    
+    prev_blurred = []
+
     while True:
         ret, frame = video_capture.read()
         # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -90,7 +97,13 @@ def recognize_video(video = 0, resize_factor = 4):
                 face_encodings = face_recognition.face_encodings(small_frame, face_locations)
                 face_matches = match_face(face_encodings, small_frame, temporal_encodings)
                 temporal_encodings = np.array(face_encodings)[np.array(face_matches)].tolist()
-            
+
+        if len(prev_blurred) > 0:
+            for (top, right, bottom, left) in prev_blurred:
+                region = frame[top:bottom, left:right]
+                frame[top:bottom, left:right] = cv2.GaussianBlur(region, (51, 51), 20)
+
+        prev_blurred = []
         for i, (top, right, bottom, left) in enumerate(face_locations):
             top *= resize_factor
             right *= resize_factor
@@ -98,17 +111,19 @@ def recognize_video(video = 0, resize_factor = 4):
             left *= resize_factor
             
             # apply gaussian blur
-            if (not face_matches[i]):
+            if not face_matches[i]:
                 region = frame[top:bottom, left:right]
                 kernel_size = 100 if (right - left) > 100 and (bottom - top) > 100 else min((right - left), (bottom - top)) 
-                frame[top:bottom, left:right] = cv2.GaussianBlur(region, (51, 51), 0)
+                frame[top:bottom, left:right] = cv2.GaussianBlur(region, (51, 51), 20)
+                prev_blurred.append((top, right, bottom, left))
             # Draw a rectangle around the face
             cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-        
+
+
         cv2.imshow('frame', frame)
         process_this_frame = not process_this_frame
 
-        if cv2.waitKey(25) & 0xFF == ord('q'):
+        if cv2.waitKey(10) & 0xFF == ord('q'):
             break
 
     
