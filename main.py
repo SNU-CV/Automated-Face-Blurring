@@ -54,10 +54,10 @@ def match_face(face_encodings, frame, temporal_encodings):
         print(exempt_distances)
         print(temporal_distances)
         
-        if len(exempt_distances) > 0 and np.amin(exempt_distances) < 0.9:
+        if len(exempt_distances) > 0 and np.amin(exempt_distances) < 0.3:
             is_matched = True
 
-        if len(temporal_distances) > 0 and np.amin(temporal_distances) < 0.25:
+        if len(temporal_distances) > 0 and np.amin(temporal_distances) < 0.2:
             is_matched = True
 
         are_matched.append(is_matched)
@@ -87,7 +87,7 @@ def recognize_video(video = 0, resize_factor = 4):
                 face_matches = []
                 temporal_encodings = []
             else:
-                face_encodings = face_recognition.face_encodings(frame, face_locations)
+                face_encodings = face_recognition.face_encodings(small_frame, face_locations)
                 face_matches = match_face(face_encodings, small_frame, temporal_encodings)
                 temporal_encodings = np.array(face_encodings)[np.array(face_matches)].tolist()
             
