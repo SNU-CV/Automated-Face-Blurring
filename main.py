@@ -18,11 +18,11 @@ def initialize_haarcascades():
     eye_cascade = cv2.CascadeClassifier(cv2_path + 'haarcascade_eye.xml')
     
 def initialize_detector():
-    global face_encodings
-    global face_names
+    global face_exempt_encodings
+    global face_exempt_names
 
-    faces_encodings = []
-    faces_names = []
+    face_exempt_encodings = []
+    face_exempt_names = []
     cur_direc = os.getcwd()
     path = os.path.join(cur_direc, 'data/faces/')
     list_of_files = [f for f in glob.glob(path+'*.jpg')]
@@ -32,25 +32,24 @@ def initialize_detector():
     for i in range(number_files):
         globals()['image_{}'.format(i)] = face_recognition.load_image_file(list_of_files[i])
         globals()['image_encoding_{}'.format(i)] = face_recognition.face_encodings(globals()['image_{}'.format(i)])[0]
-        faces_encodings.append(globals()['image_encoding_{}'.format(i)])
+        face_exempt_encodings.append(globals()['image_encoding_{}'.format(i)])
         # Create array of known names
         names[i] = names[i].replace(cur_direc, "")  
-        faces_names.append(names[i])
+        face_exempt_names.append(names[i])
 
 def detect_face(frame):
     rgb_frame = frame[:, :, ::-1]
-    
     face_locations = face_recognition.face_locations(rgb_frame, number_of_times_to_upsample=2)
 
     return face_locations
     
 def recognize_face(face_locations, frame):
-    face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+    face_encodings = face_recognition.face_encodings(frame, face_locations)
     face_names = []
     for face_encoding in face_encodings:
-        matches = face_recognition.compare_faces (faces_encodings, face_encoding)
+        matches = face_recognition.compare_faces (face_exempt_encodings, face_encoding)
         name = "Unknown"
-        face_distances = face_recognition.face_distance( faces_encodings, face_encoding)
+        face_distances = face_recognition.face_distance(face_exempt_encodings, face_encoding)
         best_match_index = np.argmin(face_distances)
         if matches[best_match_index]:
             name = faces_names[best_match_index]
@@ -86,7 +85,7 @@ def recognize_video(video = 0, speed = 4):
             
         if process_this_frame:
             face_locations = detect_face(small_frame)
-            face_names = recognize_face(face_locations, small_frame)
+            # face_names = recognize_face(face_locations, small_frame)
             
         for (top, right, bottom, left) in face_locations:
             top *= speed
