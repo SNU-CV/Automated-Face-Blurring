@@ -24,17 +24,24 @@ def initialize_detector():
     face_exempt_encodings = []
     face_exempt_names = []
     cur_direc = os.getcwd()
-    path = os.path.join(cur_direc, 'data/faces/')
+    path = os.path.join(cur_direc, 'photos/')
     list_of_files = [f for f in glob.glob(path+'*.jpg')]
     number_files = len(list_of_files)
     names = list_of_files.copy()
     
     for i in range(number_files):
-        globals()['image_{}'.format(i)] = face_recognition.load_image_file(list_of_files[i])
-        globals()['image_encoding_{}'.format(i)] = face_recognition.face_encodings(globals()['image_{}'.format(i)])[0]
-        face_exempt_encodings.append(globals()['image_encoding_{}'.format(i)])
-        # Create array of known names
-        names[i] = names[i].replace(cur_direc, "")  
+        image = face_recognition.load_image_file(list_of_files[i])
+        image_encoding = face_recognition.face_encodings(image)
+        names[i] = names[i].replace(cur_direc, "")
+
+        if len(image_encoding) == 0:
+            print("Face is not found in given image: " + names[i])
+            continue
+        elif len(image_encoding) > 1:
+            print("More than one face is found in given image: " + names[i])
+            continue 
+
+        face_exempt_encodings.append(image_encoding[0]) 
         face_exempt_names.append(names[i])
 
 def detect_face(frame):
@@ -43,29 +50,23 @@ def detect_face(frame):
 
     return face_locations
     
-def recognize_face(face_locations, frame):
+def match_face(face_locations, frame):
     face_encodings = face_recognition.face_encodings(frame, face_locations)
-    face_names = []
+    are_matched = []
+
+    if len(face_exempt_encodings) == 0:
+        return [False] * len(face_locations)
+
     for face_encoding in face_encodings:
-        matches = face_recognition.compare_faces (face_exempt_encodings, face_encoding)
-        name = "Unknown"
+        matches = face_recognition.compare_faces(face_exempt_encodings, face_encoding)
+        is_matched = False
         face_distances = face_recognition.face_distance(face_exempt_encodings, face_encoding)
         best_match_index = np.argmin(face_distances)
         if matches[best_match_index]:
-            name = faces_names[best_match_index]
-        face_names.append(name)
+            is_matched = True
+        are_matched.append(is_matched)
             
-    return face_names
-
-def detect_eyes(img, gray, faces):
-    for (top, right, bottom, left) in faces:
-        roi_gray = gray[4*top:4*bottom, 4*left:4*right]
-        roi_color = img[4*top:4*bottom, 4*left:4*right]
-        eyes = eye_cascade.detectMultiScale(roi_gray, 1.1, 5)
-        for (ex,ey,ew,eh) in eyes:
-            cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
-            
-    return img
+    return are_matched
 
 def recognize_video(video = 0, speed = 4):
     # video : path to video file, 0 to use webcam
@@ -85,21 +86,21 @@ def recognize_video(video = 0, speed = 4):
             
         if process_this_frame:
             face_locations = detect_face(small_frame)
-            # face_names = recognize_face(face_locations, small_frame)
+            face_matches = match_face(face_locations, small_frame)
             
-        for (top, right, bottom, left) in face_locations:
+        for i, (top, right, bottom, left) in enumerate(face_locations):
             top *= speed
             right *= speed
             bottom *= speed
             left *= speed
             
-            region = frame[top:bottom, left:right]
-            kernel_size = 100 if (right - left) > 100 and (bottom - top) > 100 else min((right - left), (bottom - top)) 
-            frame[top:bottom, left:right] = cv2.GaussianBlur(region, (51, 51), 0)
+            if (not face_matches[i]):
+                region = frame[top:bottom, left:right]
+                kernel_size = 100 if (right - left) > 100 and (bottom - top) > 100 else min((right - left), (bottom - top)) 
+                frame[top:bottom, left:right] = cv2.GaussianBlur(region, (51, 51), 0)
             # Draw a rectangle around the face
             cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
         
-        # img = detect_eyes(img, gray, faces)
         cv2.imshow('frame', frame)
         process_this_frame = not process_this_frame
 
