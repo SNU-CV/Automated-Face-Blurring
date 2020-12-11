@@ -51,8 +51,6 @@ def match_face(face_encodings, frame, temporal_encodings):
         is_matched = False
         exempt_distances = face_recognition.face_distance(face_exempt_encodings, face_encoding)
         temporal_distances = face_recognition.face_distance(temporal_encodings, face_encoding)
-        print(exempt_distances)
-        print(temporal_distances)
         
         if len(exempt_distances) > 0 and np.amin(exempt_distances) < 0.3:
             is_matched = True
